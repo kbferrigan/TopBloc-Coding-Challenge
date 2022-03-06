@@ -1,4 +1,5 @@
-//import netscape.javascript.JSObject; Note: Causes issues on MacOS
+//Submission by Kyle Ferrigan
+
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.*;
 import org.apache.poi.ooxml.*;
@@ -9,7 +10,6 @@ import java.util.*;
 import static spark.Spark.*;
 
 public class Main {
-
     public static void main(String[] args) {
 
         //This is required to allow GET and POST requests with the header 'content-type'
@@ -35,6 +35,7 @@ public class Main {
             JSONArray lowStockList = new JSONArray(); //Container for JSON to be returned
 
             try{
+                //Open Excel File
                 FileInputStream file = new FileInputStream(new File("resources/Inventory.xlsx"));
                 Workbook workbook = new XSSFWorkbook(file);
                 Sheet sheet = workbook.getSheetAt(0);
@@ -44,12 +45,14 @@ public class Main {
                 while (iterator.hasNext()) {
                     currentRow = iterator.next();
                     Iterator<Cell> cellIterator = currentRow.iterator();
+
                     JSONObject item = new JSONObject(); //Create new JSON object to store item values in
 
                     for (int i = 0; cellIterator.hasNext(); i++) {
                         Cell currentCell = cellIterator.next();
 
-                        if (currentCell.getCellType() == CellType.STRING) {
+                        //Add excel cells into single JSONObject "item"
+                        if (currentCell.getCellType() == CellType.STRING) { //If string it must be item name
                             //System.out.print(currentCell.getStringCellValue() + " "); //console DEBUG
                             item.put("name", currentCell.getStringCellValue());
                         }
@@ -72,11 +75,13 @@ public class Main {
                         }
                     }
 
-                    if ((double)item.get("stock") < ((double)item.get("capacity")) * 0.25){ //if item stock is less then a quarter capcity add to low stock list
+                    // If item stock is less than a quarter capacity add to low stock list
+                    if ((double)item.get("stock") < ((double)item.get("capacity")) * 0.25){
                         lowStockList.add(item);
                     }
                     //System.out.println();//console DEBUG
                 }
+
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -106,7 +111,7 @@ public class Main {
             Map<Integer,Double> theSweetSuite = new HashMap();
             Map<Integer,Double> dentistsHateUs = new HashMap();
 
-            //open Excel and fill out SKU:Price maps
+            // Open Excel and fill out SKU:Price maps
             try{
                 FileInputStream file = new FileInputStream(new File("resources/Distributors.xlsx"));
                 Workbook workbook = new XSSFWorkbook(file);
@@ -116,19 +121,23 @@ public class Main {
                 wbook.add(workbook.getSheetAt(1));
                 wbook.add(workbook.getSheetAt(2));
 
-
+                //Iterate 3 times for 3 different sheets
                 for (int i = 0; i<3; i++){
                     Iterator<Row> iterator = wbook.get(i).iterator();
-                    Row currentRow = iterator.next(); // skip reading the first row which is just the headers
+                    Row currentRow = iterator.next(); // Skip reading the first row which is just the headers
+
                     while (iterator.hasNext()) {
                         currentRow = iterator.next();
                         Iterator<Cell> cellIterator = currentRow.iterator();
+
                         int sku = 0;
                         double cost = 0;
+
                         for (int j = 0; cellIterator.hasNext(); j++) {
                             Cell currentCell = cellIterator.next();
-                            if (currentCell.getCellType() == CellType.NUMERIC) {
+                            if (currentCell.getCellType() == CellType.NUMERIC) {//check to make sure cell is numeric
                                 //System.out.print(currentCell.getNumericCellValue() + " "); //console DEBUG
+
                                 switch (j){//Store JSON values
                                     case 1: //SKU
                                         sku = ((int) currentCell.getNumericCellValue());
@@ -141,7 +150,8 @@ public class Main {
                             }
                         }
 
-                        switch(i){//change what map to put into depending on current workbook
+                        //Change what map values are put into depending on current sheet
+                        switch(i){
                             case 0:
                                 candycorp.put(sku,cost);
                                 break;
@@ -155,6 +165,7 @@ public class Main {
                         //System.out.println();//console DEBUG
                     }
                 }
+
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -162,36 +173,39 @@ public class Main {
             }
 
 
-
+            //Compare given SKU's to SKU:Price Maps for each distributor and find cheapest price
             for(Object keys : kSet){
-                //System.out.println(keys); //DEBUG
-                //Use keys to find amount needed here and then find what the lowest cost is
+
                 int sku = Integer.valueOf((String) keys);
                 //System.out.println(sku); //DEBUG
+                final double MAX_THRESHOLD = 999; //should be much higher than max price of a single item
 
-                double cc = 999999999;
-                double tss = 999999999;
-                double dhu = 999999999;
+                double cc = MAX_THRESHOLD;
+                double tss = MAX_THRESHOLD;
+                double dhu = MAX_THRESHOLD;
 
                 //Inexpensive way of filtering out null
+                //If null, then assign MAX_THRESHOLD price, otherwise use the mapped price, mapped price should always be lower than MAX_THRESHOLD, filtering it out in the math.min
                 if (candycorp.get(sku) == null) {
-                    cc = 999999999;
+                    cc = MAX_THRESHOLD;
                 }else{
                     cc = candycorp.get(sku);
                 }
 
                 if (theSweetSuite.get(sku) == null) {
-                    tss = 999999999;
+                    tss = MAX_THRESHOLD;
                 }else{
                     tss = theSweetSuite.get(sku);
                 }
 
                 if (dentistsHateUs.get(sku) == null) {
-                    dhu = 999999999;
+                    dhu = MAX_THRESHOLD;
                 }else {
                     dhu = dentistsHateUs.get(sku);
                 }
-                try{//add the minimum cost item times the amount of the item, round to nearest 100th
+
+                // Add the minimum cost item multiplied with the amount of the item. If a field is not a number return an error message
+                try{
                     restockCost += (Integer.parseInt((String)jObj.get(Integer.toString(sku))) * Math.min(cc,Math.min(tss,dhu)));
                 }catch (Exception NumberFormatException){
                     return "ERROR: Please enter integers into all fields";
