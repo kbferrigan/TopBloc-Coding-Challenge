@@ -1,3 +1,5 @@
+//Submission by Kyle Ferrigan
+
 async function getLowStockItems() {//asych due to fetch request
     console.log("Attempting to fetch low-stock items") //DEBUG
 
